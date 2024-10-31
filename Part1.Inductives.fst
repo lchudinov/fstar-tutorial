@@ -151,4 +151,42 @@ let divide (x:int) (y:int{y<>0}) = x / y
 
 // `Fstar.Pervasives` defines the `either` type:
 type either a b =
-  | Inl :  
+  | Inl : v: a -> either a b
+  | Inr : v: b -> either a b
+
+let same_case #a #b #c #d (x: either a b) (y: either c d)
+  : bool
+  = match x, y with
+  | Inl _, Inl _
+  | Inr _, Inr _ -> true
+  | _ -> false
+
+let sum (x: either bool int) (y: either bool int{same_case x y})
+  : z:either bool int{ Inl? z <==> Inl? x}
+  = match x, y with
+  | Inl xl, Inl yl -> Inl (xl || yl)
+  | Inr xr, Inr yr -> Inr (xr + yr)
+  
+// ## Lists
+
+// Here's the definition of `list` from `Prims`:
+type list' a =
+  | Nil' : list' a
+  | Cons': hd:a -> tl:list' a -> list' a
+
+// # Length of a list
+
+let rec length #a (l:list a)
+  : nat
+  = match l with
+  | Nil -> 0
+  | _ :: tl -> 1 + length tl
+  
+// ## Exercises
+
+val append (#a:Type) (l1 l2: list a) : l:list a {length l1 + length l2 = length l}
+let rec append #a l1 l2
+  : list a
+  = match l1 with
+  | [] -> l2
+  | hd :: tl -> hd :: append tl l2
