@@ -127,3 +127,66 @@ let rec sort_annotaned_correct (l:list int)
       assert (sorted (sort l));
       append_mem (sort lo) (pivot :: sort hi);
       assert (forall i. mem i l = mem i (sort l))
+
+// ## Limitations of SMT-based proofs at higher order
+
+// Why we used `(<=) pivot` instead of `fun x -> pivot <= x` in our code ?
+// We could indeed have written `sort` like this:
+let rec sort_alt (l:list int)
+  : Tot (list int) (decreases (length l))
+  = match l with
+    | [] -> []
+    | pivot :: tl ->
+      let hi, lo = partition (fun x -> pivot <= x) tl in
+      append (sort_alt lo) (pivot :: sort_alt hi)
+      
+// And we could have tried to write our main lemma this way:
+
+let sort_alt_ok (l:list int) =
+    let m = sort_alt l in
+    sorted m /\
+    (forall i. mem i l = mem i m)
+
+// let rec sort_alt_correct_annotated (l:list int)
+//   : Lemma (ensures sort_alt_ok l)
+//           (decreases (length l))
+//   = match l with
+//     | [] -> ()
+//     | pivot :: tl ->
+//       let hi, lo = partition (fun x -> pivot <= x) tl in
+//       assert (length lo + length hi == length tl);
+//       sort_alt_correct_annotated hi;
+//       assert (sort_alt_ok hi);
+//       sort_alt_correct_annotated lo;
+//       assert (sort_alt_ok lo);
+//       partition_mem (fun x -> pivot <= x) tl;
+//       assert (forall i. mem i tl = mem i hi || mem i lo);
+//       assert (forall i. mem i hi ==> pivot <= i);
+//       assert (forall i. mem i lo ==> i < pivot);
+//       // THIS NEXT LINE IS NOT PROVABLE BY SMT ALONE
+//       assert (sort_alt l == (append (sort_alt lo) (pivot :: sort_alt hi)));
+//       sorted_concat (sort_alt lo) (sort_alt hi) pivot;
+//       assert (sorted (sort_alt l));
+//       append_mem (sort_alt lo) (pivot :: sort_alt hi);
+//       assert (forall i. mem i l = mem i (sort_alt l))
+
+// F* encodes its higher-order logic into the SMT solver's first order logic with some loss of precision, particularly for lambda-terms.
+// In this case, the SMT solver is unable to prove that the occurrence of 
+// `fun x -> pivot <= x` that appears in the proof `sort_alt_correct_annotated` is identical to the occurrence of
+// the same lambda term in `sort_alt`, so it cannot conclude that `sort_alt l` is really equal to
+// `(append (sort_alt lo) (pivot :: sort_alt hi))`.
+
+// Here are some ways to avoid such pitfalls:
+
+// - Try to use named functions at higher-order, rather than lambda literals. Named functions
+//   do not suffer a loss in precision when encoded to SMT. This is the reason why `(<=) pivot` worked out
+//   better than `fun x -> pivot <= x`.
+// - If you must use lambda terms, sometimes an intrinsic proof style can help.
+// - If you must use lambda terms with extrinsic proofs, you can still complete the proof, but you will
+//   have to help F* with tactics or proofs by normalization.
+
+
+// ## An intrinsic proof of sort
+
+let rec sort_intrinsic (l:list int)
+  : Tot 
