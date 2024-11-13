@@ -189,4 +189,31 @@ let sort_alt_ok (l:list int) =
 // ## An intrinsic proof of sort
 
 let rec sort_intrinsic (l:list int)
-  : Tot 
+  : Tot (m: list int {sorted m /\ (forall i. mem i l = mem i m)})
+    (decreases (length l))
+  = match l with
+    | [] -> []
+    | pivot :: tl ->
+      let hi, lo = partition (fun x -> pivot <= x) tl in
+      partition_mem (fun x -> pivot <= x) tl;
+      sorted_concat (sort_intrinsic lo) (sort_intrinsic hi) pivot;
+      append_mem (sort_intrinsic lo) (pivot :: sort_intrinsic hi);
+      append (sort_intrinsic lo )(pivot :: sort_intrinsic hi)
+     
+// ## Runtime cost?
+
+// If you ask F* to extract the program to OCaml using `fstar --codegen OCaml Part1.Quicksort.fst`, here's what you get:
+// let rec (sort_intrinsic : Prims.int Prims.list -> Prims.int Prims.list) =
+//   fun l ->
+//     match l with
+//     | [] -> []
+//     | pivot::tl ->
+//        let uu___ = partition (fun x -> pivot <= x) tl in
+//        (match uu___ with
+//         | (hi, lo) ->
+//           append (sort_intrinsic lo) (pivot :: (sort_intrinsic hi)))
+
+// The calls to lemmas have disappeared.
+
+// ## Exercises
+// See Part1.Quicksort.Generic
