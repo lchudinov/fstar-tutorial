@@ -217,3 +217,4 @@ let rec sort_intrinsic (l:list int)
 
 // ## Exercises
 // See Part1.Quicksort.Generic
+// Part1.Quicksort.Permutation
