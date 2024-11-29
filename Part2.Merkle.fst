@@ -59,9 +59,62 @@ let resource_id = list bool
 
 module L = FStar.List.Tot
 
-// let rec get #h
-//             (ri:resource_id)
-//             (tree:mtree (L.length ri) h)
-//   : Tot resource
-//   = match tree with
-//     | 
+let rec get #h
+            (ri:resource_id)
+            (tree:mtree (L.length ri) h)
+  : Tot resource
+    (decreases ri)
+  = match ri with
+    | [] -> L?.res tree
+    | hd::tl -> if hd then get tl (N?.left tree) else get tl (N?.right tree)
+    
+// ## The Prover
+
+type resource_with_evidence : nat -> Type =
+  | RES:
+      res:resource ->
+      ri:resource_id ->
+      hashes:list hash_t {L.length ri == L.length hashes } ->
+      resource_with_evidence (L.length ri)
+      
+/// Retrieves data references by the path, together with the hashes
+/// of the sibling nodes along that path
+let rec get_with_evidence (#h:_)
+                          (rid:resource_id)
+                          (tree:mtree (L.length rid) h)
+  : Tot (resource_with_evidence (L.length rid))
+        (decreases rid)
+  = match rid with
+    | [] -> RES (L?.res tree) [] []
+    | bit::rid' -> 
+      let N #_ #hl #hr left right = tree in
+        if bit then
+          let p = get_with_evidence rid' left in
+          RES p.res rid (hr :: p.hashes)
+        else
+          let p = get_with_evidence rid' right in
+          RES p.res rid (hl :: p.hashes)
+
+// ## The Verifier
+
+let tail #n (p:resource_with_evidence n { n > 0 })
+  : resource_with_evidence (n - 1)
+  = RES p.res (L.tail p.ri) (L.tail p.hashes)
+  
+let rec compute_root_hash (#n:nat)
+                          (p:resource_with_evidence n)
+  : hash_t
+  = let RES d ri hashes = p in
+    match ri with
+    | [] -> hash p.res
+    | bit::ri' -> 
+      let h' = compute_root_hash (tail p) in
+      if bit then
+        hash (concat h' (L.hd hashes))
+      else
+        hash (concat (L.hd hashes) h')
+
+let verify #h #n (p:resource_with_evidence n) 
+                 (tree:mtree n h)
+  : bool
+  = compute_root_hash p = h
